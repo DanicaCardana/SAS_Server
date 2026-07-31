@@ -14,10 +14,10 @@ INSERT INTO `roles` (`id`, `name`, `description`) VALUES
 -- 2. Insert Users
 -- Passwords below are bcrypt hashes for "password123" ($2b$10$e.g.)
 INSERT INTO `users` (`id`, `role_id`, `first_name`, `last_name`, `email`, `phone`, `password_hash`, `status`) VALUES
-(1, 1, 'Owner', 'Admin', 'admin@sas.com', '09171234567', '$2b$10$r8Q8PzYmX7Q3kG.0G0.1g.d.y4tJ2R8Z9A0B1C2D3E4F5G6H7I8J9', 'APPROVED'),
-(2, 2, 'Maria', 'Cashier', 'cashier@sas.com', '09181234567', '$2b$10$r8Q8PzYmX7Q3kG.0G0.1g.d.y4tJ2R8Z9A0B1C2D3E4F5G6H7I8J9', 'APPROVED'),
-(3, 3, 'Jane', 'Doe', 'jane.doe@example.com', '09191234567', '$2b$10$r8Q8PzYmX7Q3kG.0G0.1g.d.y4tJ2R8Z9A0B1C2D3E4F5G6H7I8J9', 'APPROVED'),
-(4, 3, 'John', 'Smith', 'john.smith@example.com', '09201234567', '$2b$10$r8Q8PzYmX7Q3kG.0G0.1g.d.y4tJ2R8Z9A0B1C2D3E4F5G6H7I8J9', 'PENDING');
+(1, 1, 'Owner', 'Admin', 'admin@sas.com', '09171234567', '$2a$12$XIdyUyZhdlz3LdTE.BOXNe9pyi1s5qULTPZTb8Gh5ISVmEwLT4HcS', 'APPROVED'),
+(2, 2, 'Maria', 'Cashier', 'cashier@sas.com', '09181234567', '$2a$12$XIdyUyZhdlz3LdTE.BOXNe9pyi1s5qULTPZTb8Gh5ISVmEwLT4HcS', 'APPROVED'),
+(3, 3, 'Jane', 'Doe', 'jane.doe@example.com', '09191234567', '$2a$12$XIdyUyZhdlz3LdTE.BOXNe9pyi1s5qULTPZTb8Gh5ISVmEwLT4HcS', 'APPROVED'),
+(4, 3, 'John', 'Smith', 'john.smith@example.com', '09201234567', '$2a$12$XIdyUyZhdlz3LdTE.BOXNe9pyi1s5qULTPZTb8Gh5ISVmEwLT4HcS', 'PENDING');
 
 -- 3. Insert Service Categories
 INSERT INTO `service_categories` (`id`, `name`, `description`) VALUES
