@@ -7,7 +7,7 @@ const { authorizeRoles } = require('../middleware/roleMiddleware');
 router.use(authenticateToken);
 
 // Admin-only endpoints
-router.get('/', authorizeRoles('ADMIN'), getUsers);
+router.get('/', authorizeRoles('ADMIN', 'CASHIER'), getUsers);
 router.put('/:id/status', authorizeRoles('ADMIN'), updateUserStatus);
 
 // Self user profile update

@@ -6,7 +6,7 @@ const pool = require('../config/db');
 // @route   POST /api/auth/register
 const register = async (req, res) => {
   try {
-    const { first_name, last_name, email, phone, password, role_name } = req.body;
+    const { first_name, last_name, email, phone, password, role_name, gender, home_address } = req.body;
 
     if (!first_name || !last_name || !email || !password) {
       return res.status(400).json({ success: false, message: 'First name, last name, email, and password are required' });
@@ -34,9 +34,9 @@ const register = async (req, res) => {
 
     // Insert new user with status 'PENDING'
     const [result] = await pool.query(
-      `INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, status)
-       VALUES (?, ?, ?, ?, ?, ?, 'PENDING')`,
-      [role_id, first_name, last_name, email, phone || null, password_hash]
+      `INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, gender, home_address, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
+      [role_id, first_name, last_name, email, phone || null, password_hash, gender || null, home_address || null]
     );
 
     return res.status(201).json({
