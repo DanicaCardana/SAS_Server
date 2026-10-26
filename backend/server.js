@@ -30,6 +30,8 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/reports', reportRoutes);
 
+const pool = require('./config/db');
+
 // Base Health Check Endpoints
 app.get('/', (req, res) => {
   res.json({
@@ -39,9 +41,27 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'UNKNOWN';
+  let dbError = null;
+  try {
+    const conn = await pool.getConnection();
+    dbStatus = 'CONNECTED';
+    conn.release();
+  } catch (err) {
+    dbStatus = 'FAILED';
+    dbError = err.message;
+  }
+
   res.json({
-    status: 'HEALTHY',
+    status: dbStatus === 'CONNECTED' ? 'HEALTHY' : 'DEGRADED',
+    database: {
+      status: dbStatus,
+      error: dbError,
+      host: process.env.DB_HOST || 'localhost (default)',
+      database: process.env.DB_NAME || 'sas_db (default)',
+      ssl: process.env.DB_SSL === 'true'
+    },
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
