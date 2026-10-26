@@ -1,5 +1,59 @@
 const pool = require('../config/db');
 
+// Helper: converts "HH:MM:SS" or "HH:MM" to total minutes from midnight
+const timeToMinutes = (t) => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+};
+
+// @desc    Get booked time slots for a service on a given date
+// @route   GET /api/bookings/slots?service_id=X&date=YYYY-MM-DD
+const getBookedSlots = async (req, res) => {
+  try {
+    const { service_id, date } = req.query;
+    if (!service_id || !date) {
+      return res.status(400).json({ success: false, message: 'service_id and date are required' });
+    }
+
+    // Fetch duration of the service
+    const [services] = await pool.query('SELECT duration_minutes FROM services WHERE id = ?', [service_id]);
+    if (services.length === 0) {
+      return res.status(404).json({ success: false, message: 'Service not found' });
+    }
+    const duration = services[0].duration_minutes;
+
+    // Fetch all active (non-cancelled) bookings for that service+date
+    const [bookings] = await pool.query(
+      `SELECT b.id, b.time_slot, b.status, CONCAT(u.first_name, ' ', u.last_name) AS client_name
+       FROM bookings b
+       JOIN users u ON b.client_id = u.id
+       WHERE b.service_id = ? AND b.booking_date = ? AND b.status IN ('PENDING', 'CONFIRMED')
+       ORDER BY b.time_slot ASC`,
+      [service_id, date]
+    );
+
+    // Build booked windows
+    const slots = bookings.map(b => {
+      const startMin = timeToMinutes(b.time_slot);
+      const endMin   = startMin + duration;
+      const endH     = Math.floor(endMin / 60).toString().padStart(2, '0');
+      const endM     = (endMin % 60).toString().padStart(2, '0');
+      return {
+        booking_id:  b.id,
+        time_slot:   b.time_slot.slice(0, 5), // HH:MM
+        end_time:    `${endH}:${endM}`,
+        status:      b.status,
+        client_name: b.client_name,
+      };
+    });
+
+    return res.json({ success: true, duration_minutes: duration, data: slots });
+  } catch (error) {
+    console.error('Get Booked Slots Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error fetching booked slots', error: error.message });
+  }
+};
+
 // @desc    Create a new booking or walk-in availment
 // @route   POST /api/bookings
 const createBooking = async (req, res) => {
@@ -14,7 +68,7 @@ const createBooking = async (req, res) => {
     }
 
     // Check service validity
-    const [services] = await pool.query('SELECT price, status FROM services WHERE id = ?', [service_id]);
+    const [services] = await pool.query('SELECT price, status, duration_minutes FROM services WHERE id = ?', [service_id]);
     if (services.length === 0) {
       return res.status(404).json({ success: false, message: 'Selected service not found' });
     }
@@ -23,8 +77,33 @@ const createBooking = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Selected service is currently unavailable' });
     }
 
-    const bookingType = (type || (req.user.role_name === 'CASHIER' ? 'WALK_IN' : 'ONLINE_BOOKING')).toUpperCase();
-    const initialStatus = bookingType === 'WALK_IN' ? 'CONFIRMED' : 'PENDING';
+    const duration = services[0].duration_minutes;
+
+    // --- Time slot conflict check ---
+    // Fetch all active bookings for this service on this date
+    const [existingBookings] = await pool.query(
+      `SELECT time_slot FROM bookings
+       WHERE service_id = ? AND booking_date = ? AND status IN ('PENDING', 'CONFIRMED')`,
+      [service_id, booking_date]
+    );
+
+    const newStart = timeToMinutes(time_slot);
+    const newEnd   = newStart + duration;
+
+    for (const eb of existingBookings) {
+      const exStart = timeToMinutes(eb.time_slot);
+      const exEnd   = exStart + duration;
+      // Overlap if: newStart < exEnd AND newEnd > exStart
+      if (newStart < exEnd && newEnd > exStart) {
+        return res.status(409).json({
+          success: false,
+          message: `This time slot (${time_slot}) is already booked for this service. Please choose a different time.`
+        });
+      }
+    }
+
+    const bookingType    = (type || (req.user.role_name === 'CASHIER' ? 'WALK_IN' : 'ONLINE_BOOKING')).toUpperCase();
+    const initialStatus  = bookingType === 'WALK_IN' ? 'CONFIRMED' : 'PENDING';
 
     const [result] = await pool.query(
       `INSERT INTO bookings (client_id, service_id, type, booking_date, time_slot, status, notes)
@@ -57,7 +136,7 @@ const getBookings = async (req, res) => {
   try {
     const { status, type, date, client_id } = req.query;
     let query = `
-      SELECT b.id, b.client_id, CONCAT(u.first_name, ' ', u.last_name) AS client_name, u.email AS client_email, u.phone AS client_phone,
+      SELECT b.id, b.client_id, u.client_number, CONCAT(u.first_name, ' ', u.last_name) AS client_name, u.email AS client_email, u.phone AS client_phone,
              b.service_id, s.name AS service_name, s.price AS service_price, s.duration_minutes,
              b.type, b.booking_date, b.time_slot, b.status, b.notes, b.created_at
       FROM bookings b
@@ -137,4 +216,4 @@ const updateBookingStatus = async (req, res) => {
   }
 };
 
-module.exports = { createBooking, getBookings, updateBookingStatus };
+module.exports = { createBooking, getBookings, updateBookingStatus, getBookedSlots };

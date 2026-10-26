@@ -1,15 +1,30 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { generateUserNumber } = require('../utils/numberGenerator');
 
 // @desc    Register a new user (Client or Cashier) -> Defaults to PENDING status
 // @route   POST /api/auth/register
 const register = async (req, res) => {
   try {
-    const { first_name, last_name, email, phone, password, role_name, gender, home_address } = req.body;
+    const {
+      first_name,
+      last_name,
+      middle_name,
+      home_address,
+      address,
+      gender,
+      civil_status,
+      status: req_status,
+      birthdate,
+      email,
+      phone,
+      password,
+      role_name
+    } = req.body;
 
-    if (!first_name || !last_name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'First name, last name, email, and password are required' });
+    if (!first_name || !last_name || !email) {
+      return res.status(400).json({ success: false, message: 'First name, last name, and email are required' });
     }
 
     // Determine target role (default to CLIENT if not specified)
@@ -28,15 +43,45 @@ const register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email address is already registered' });
     }
 
-    // Hash password
+    // Auto-generate client or staff number
+    const client_number = await generateUserNumber(pool, targetRoleName);
+
+    // Auto-generate temporary password on registration if not supplied
+    const f = (first_name || '').trim().toLowerCase().replace(/\s+/g, '');
+    const l = (last_name || '').trim().toLowerCase().replace(/\s+/g, '');
+    const plain_password = (password && password.trim())
+      ? password.trim()
+      : ((f && l) ? `${f}${l}123` : 'client123');
+
     const salt = await bcrypt.genSalt(10);
-    const password_hash = await bcrypt.hash(password, salt);
+    const password_hash = await bcrypt.hash(plain_password, salt);
+
+    const formattedAddress = (home_address || address || '').trim() || null;
+    const formattedGender = gender ? gender.toUpperCase() : null;
+    const resolvedCivilStatus = civil_status
+      ? civil_status.toUpperCase()
+      : (req_status && ['SINGLE', 'MARRIED', 'WIDOWED', 'SEPARATED', 'OTHER'].includes(req_status.toUpperCase()) ? req_status.toUpperCase() : null);
+    const formattedBirthdate = birthdate || null;
 
     // Insert new user with status 'PENDING'
     const [result] = await pool.query(
-      `INSERT INTO users (role_id, first_name, last_name, email, phone, password_hash, gender, home_address, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
-      [role_id, first_name, last_name, email, phone || null, password_hash, gender || null, home_address || null]
+      `INSERT INTO users (role_id, client_number, first_name, last_name, middle_name, email, phone, password_hash, plain_password, gender, civil_status, birthdate, home_address, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
+      [
+        role_id,
+        client_number,
+        first_name.trim(),
+        last_name.trim(),
+        middle_name ? middle_name.trim() : null,
+        email.trim(),
+        phone ? phone.trim() : null,
+        password_hash,
+        plain_password,
+        formattedGender,
+        resolvedCivilStatus,
+        formattedBirthdate,
+        formattedAddress
+      ]
     );
 
     return res.status(201).json({
@@ -44,9 +89,12 @@ const register = async (req, res) => {
       message: 'Registration successful! Account submitted for Admin approval.',
       data: {
         id: result.insertId,
+        client_number,
         first_name,
         last_name,
+        middle_name: middle_name || null,
         email,
+        plain_password,
         role_name: targetRoleName,
         status: 'PENDING'
       }
@@ -69,7 +117,7 @@ const login = async (req, res) => {
 
     // Fetch user & role details
     const [rows] = await pool.query(
-      `SELECT u.id, u.role_id, r.name AS role_name, u.first_name, u.last_name, u.email, u.password_hash, u.status
+      `SELECT u.id, u.role_id, r.name AS role_name, u.client_number, u.first_name, u.last_name, u.email, u.password_hash, u.status
        FROM users u
        JOIN roles r ON u.role_id = r.id
        WHERE u.email = ?`,
@@ -82,17 +130,11 @@ const login = async (req, res) => {
 
     const user = rows[0];
 
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-
-    // Check registration approval status
+    // Check registration approval status BEFORE password verification
     if (user.status === 'PENDING') {
       return res.status(403).json({
         success: false,
-        message: 'Your account registration is pending Admin approval. Please contact the salon administrator.'
+        message: 'Your account registration is pending Admin approval. A password will be generated once approved.'
       });
     }
 
@@ -103,9 +145,22 @@ const login = async (req, res) => {
       });
     }
 
+    if (!user.password_hash) {
+      return res.status(401).json({
+        success: false,
+        message: 'Your account does not have a password set. Please contact the salon administrator.'
+      });
+    }
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
     // Sign JWT Token
     const token = jwt.sign(
-      { id: user.id, role_id: user.role_id, role_name: user.role_name, email: user.email },
+      { id: user.id, role_id: user.role_id, role_name: user.role_name, client_number: user.client_number, email: user.email },
       process.env.JWT_SECRET || 'sas_super_secret_jwt_key_2026_salon_spa_app',
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -117,6 +172,7 @@ const login = async (req, res) => {
         id: user.id,
         role_id: user.role_id,
         role_name: user.role_name,
+        client_number: user.client_number,
         first_name: user.first_name,
         last_name: user.last_name,
         email: user.email,

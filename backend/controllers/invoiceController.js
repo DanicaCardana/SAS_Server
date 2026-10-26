@@ -76,7 +76,7 @@ const getInvoices = async (req, res) => {
   try {
     const { status, client_id } = req.query;
     let query = `
-      SELECT i.id, i.invoice_number, i.booking_id, i.client_id, 
+      SELECT i.id, i.invoice_number, i.booking_id, i.client_id, u.client_number,
              CONCAT(u.first_name, ' ', u.last_name) AS client_name, u.email AS client_email,
              i.cashier_id, CONCAT(c.first_name, ' ', c.last_name) AS cashier_name,
              s.name AS service_name, i.subtotal, i.tax, i.discount, i.total_amount, i.status, i.created_at

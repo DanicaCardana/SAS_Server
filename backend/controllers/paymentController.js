@@ -77,7 +77,7 @@ const processPayment = async (req, res) => {
 const getPaymentHistory = async (req, res) => {
   try {
     let query = `
-      SELECT p.id AS payment_id, p.invoice_id, i.invoice_number, i.client_id,
+      SELECT p.id AS payment_id, p.invoice_id, i.invoice_number, i.client_id, u.client_number,
              CONCAT(u.first_name, ' ', u.last_name) AS client_name, u.email AS client_email,
              s.name AS service_name, p.payment_method, p.amount_paid, p.change_amount,
              i.total_amount, p.transaction_ref, p.paid_at

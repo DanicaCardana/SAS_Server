@@ -14,7 +14,7 @@ const authenticateToken = async (req, res, next) => {
 
     // Fetch user details from DB to ensure account is still active and approved
     const [rows] = await pool.query(
-      `SELECT u.id, u.role_id, r.name AS role_name, u.first_name, u.last_name, u.email, u.status
+      `SELECT u.id, u.role_id, r.name AS role_name, u.client_number, u.first_name, u.last_name, u.email, u.status
        FROM users u
        JOIN roles r ON u.role_id = r.id
        WHERE u.id = ?`,

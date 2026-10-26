@@ -1,0 +1,3 @@
+ALTER TABLE `users`
+  ADD COLUMN `gender` ENUM('MALE','FEMALE','OTHER') DEFAULT NULL AFTER `phone`,
+  ADD COLUMN `home_address` TEXT DEFAULT NULL AFTER `gender`;
