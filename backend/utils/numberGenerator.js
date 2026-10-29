@@ -5,7 +5,7 @@
  * - Staff (Admin / Cashier): STF-2026-0003
  */
 const generateUserNumber = async (pool, roleName) => {
-  const isStaff = ['ADMIN', 'CASHIER'].includes((roleName || '').toUpperCase());
+  const isStaff = ['ADMIN', 'CASHIER', 'NAIL_TECHNICIAN', 'BEAUTICIAN', 'THERAPIST'].includes((roleName || '').toUpperCase());
   const prefix = isStaff ? 'STF' : 'CLI';
   const year = new Date().getFullYear();
   const searchPattern = `${prefix}-${year}-%`;

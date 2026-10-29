@@ -48,10 +48,17 @@ const processPayment = async (req, res) => {
       [req.user.role_name === 'CLIENT' ? null : req.user.id, invoice_id]
     );
 
-    // 3. Update associated booking status to 'COMPLETED'
+    // 3. Update associated booking(s) status to 'COMPLETED'
+    if (invoice.booking_id) {
+      await pool.query(
+        `UPDATE bookings SET status = 'COMPLETED', updated_at = NOW() WHERE id = ?`,
+        [invoice.booking_id]
+      );
+    }
     await pool.query(
-      `UPDATE bookings SET status = 'COMPLETED', updated_at = NOW() WHERE id = ?`,
-      [invoice.booking_id]
+      `UPDATE bookings SET status = 'COMPLETED', updated_at = NOW()
+       WHERE id IN (SELECT booking_id FROM invoice_items WHERE invoice_id = ? AND booking_id IS NOT NULL)`,
+      [invoice_id]
     );
 
     return res.status(201).json({

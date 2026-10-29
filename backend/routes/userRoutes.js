@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { getUsers, updateUserStatus, updateProfile, changePassword, createStaff, resetPassword } = require('../controllers/userController');
+const { getUsers, updateUserStatus, updateProfile, changePassword, createStaff, resetPassword, getStaff } = require('../controllers/userController');
 const { authenticateToken } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 
 router.use(authenticateToken);
+
+// Staff list for assigning services (Admin & Cashier)
+router.get('/staff', authorizeRoles('ADMIN', 'CASHIER'), getStaff);
 
 // Admin-only endpoints
 router.get('/', authorizeRoles('ADMIN', 'CASHIER'), getUsers);

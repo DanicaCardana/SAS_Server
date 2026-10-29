@@ -58,7 +58,7 @@ const getBookedSlots = async (req, res) => {
 // @route   POST /api/bookings
 const createBooking = async (req, res) => {
   try {
-    const { service_id, client_id, type, booking_date, time_slot, notes } = req.body;
+    const { service_id, client_id, staff_id, type, booking_date, time_slot, notes } = req.body;
 
     // Determine target client_id
     const targetClientId = req.user.role_name === 'CLIENT' ? req.user.id : client_id;
@@ -106,9 +106,9 @@ const createBooking = async (req, res) => {
     const initialStatus  = bookingType === 'WALK_IN' ? 'CONFIRMED' : 'PENDING';
 
     const [result] = await pool.query(
-      `INSERT INTO bookings (client_id, service_id, type, booking_date, time_slot, status, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [targetClientId, service_id, bookingType, booking_date, time_slot, initialStatus, notes || '']
+      `INSERT INTO bookings (client_id, service_id, staff_id, type, booking_date, time_slot, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [targetClientId, service_id, staff_id || null, bookingType, booking_date, time_slot, initialStatus, notes || '']
     );
 
     return res.status(201).json({
@@ -118,6 +118,7 @@ const createBooking = async (req, res) => {
         id: result.insertId,
         client_id: targetClientId,
         service_id,
+        staff_id: staff_id || null,
         type: bookingType,
         booking_date,
         time_slot,
@@ -138,10 +139,13 @@ const getBookings = async (req, res) => {
     let query = `
       SELECT b.id, b.client_id, u.client_number, CONCAT(u.first_name, ' ', u.last_name) AS client_name, u.email AS client_email, u.phone AS client_phone,
              b.service_id, s.name AS service_name, s.price AS service_price, s.duration_minutes,
+             b.staff_id, st.client_number AS staff_number, CONCAT(st.first_name, ' ', st.last_name) AS staff_name, r_st.name AS staff_role,
              b.type, b.booking_date, b.time_slot, b.status, b.notes, b.created_at
       FROM bookings b
       JOIN users u ON b.client_id = u.id
       JOIN services s ON b.service_id = s.id
+      LEFT JOIN users st ON b.staff_id = st.id
+      LEFT JOIN roles r_st ON st.role_id = r_st.id
       WHERE 1=1
     `;
     const params = [];

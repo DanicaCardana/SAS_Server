@@ -213,8 +213,8 @@ const createStaff = async (req, res) => {
     }
 
     const targetRole = (role_name || 'CASHIER').toUpperCase();
-    if (!['CASHIER', 'ADMIN'].includes(targetRole)) {
-      return res.status(400).json({ success: false, message: 'Staff role must be CASHIER or ADMIN' });
+    if (!['CASHIER', 'ADMIN', 'NAIL_TECHNICIAN', 'BEAUTICIAN', 'THERAPIST'].includes(targetRole)) {
+      return res.status(400).json({ success: false, message: 'Invalid staff role specified' });
     }
 
     if (password.trim().length < 6) {
@@ -343,4 +343,27 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { getUsers, updateUserStatus, updateProfile, changePassword, createStaff, resetPassword };
+// @desc    Get all active staff specialists (Admin & Cashier)
+// @route   GET /api/users/staff
+const getStaff = async (req, res) => {
+  try {
+    const query = `
+      SELECT u.id, u.client_number, u.first_name, u.last_name,
+             r.name AS role_name, r.description AS role_description,
+             u.email, u.phone
+      FROM users u
+      JOIN roles r ON u.role_id = r.id
+      WHERE r.name IN ('NAIL_TECHNICIAN', 'BEAUTICIAN', 'THERAPIST', 'CASHIER', 'ADMIN')
+        AND u.status = 'APPROVED'
+      ORDER BY FIELD(r.name, 'NAIL_TECHNICIAN', 'BEAUTICIAN', 'THERAPIST', 'CASHIER', 'ADMIN'), u.first_name ASC
+    `;
+    const [staff] = await pool.query(query);
+    return res.json({ success: true, count: staff.length, data: staff });
+  } catch (error) {
+    console.error('Get Staff Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error retrieving staff', error: error.message });
+  }
+};
+
+module.exports = { getUsers, updateUserStatus, updateProfile, changePassword, createStaff, resetPassword, getStaff };
+
